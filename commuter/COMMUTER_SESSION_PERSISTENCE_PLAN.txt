@@ -1,0 +1,304 @@
+Commuter App Session Persistence Plan
+=====================================
+
+What the request means
+----------------------
+The commuter should not need to type email and password again when the app is
+accidentally closed, killed, backgrounded, or reopened on the same device.
+
+Expected behavior:
+- First install / first use: show Welcome.
+- Successful commuter login: keep the Firebase Auth session on that device.
+- App closed accidentally: reopen into the correct commuter area without
+  asking for email/password again.
+- App backgrounded / resumed: keep the account signed in.
+- Explicit Logout button: clear the Firebase Auth session.
+- Guest mode: product decision needed. Current app intentionally clears guest
+  anonymous auth on startup, so guest does not persist after restart.
+- Unverified email commuter: resume to Email Verification until verified.
+- Temporary-password commuter: resume to Change Password until password setup
+  is complete.
+- Blocked/suspended/non-commuter account: must not continue into commuter
+  features.
+
+Current code findings
+---------------------
+Important files inspected:
+- commuter/lib/main.dart
+- commuter/lib/core/router/app_router.dart
+- commuter/lib/presentation/screens/splash/splash_screen.dart
+- commuter/lib/presentation/viewmodels/auth_viewmodel.dart
+- commuter/lib/data/repositories/auth_repository_impl.dart
+- commuter/lib/domain/repositories/auth_repository.dart
+- commuter/lib/domain/repositories/auth_exception.dart
+- commuter/lib/domain/entities/user.dart
+- commuter/lib/presentation/screens/login/login_screen.dart
+- commuter/lib/presentation/screens/welcome/welcome_screen.dart
+- commuter/lib/presentation/screens/dashboard/dashboard_screen.dart
+- commuter/lib/presentation/widgets/app_lifecycle_observer.dart
+- commuter/lib/data/services/app_session_service.dart
+- commuter/pubspec.yaml
+
+Observed behavior source:
+1. The commuter app already starts with GoRouter at:
+   initialLocation: AppRouter.splash
+
+   AppRouter.splash is '/' and builds SplashScreen.
+
+2. SplashScreen waits 2.5 seconds, checks FirebaseAuth.instance.currentUser,
+   then routes:
+   - real non-anonymous user -> AppRouter.dashboard
+   - no user or anonymous guest -> AppRouter.welcome
+
+   This means the commuter app already tries to restore real Firebase sessions.
+
+3. SplashScreen intentionally signs out anonymous guest users on startup:
+   if (firebaseUser != null && firebaseUser.isAnonymous) {
+     await FirebaseAuth.instance.signOut();
+   }
+
+   This means guest sessions do not persist after app close. That appears
+   intentional based on the comment in the file.
+
+4. AuthRepositoryImpl already listens to Firebase Auth:
+   _firebaseAuth.authStateChanges().listen(_onAuthStateChanged)
+
+   It builds the app-level User object from the restored Firebase user.
+
+5. AuthRepositoryImpl validates account role/status:
+   - rejects driver accounts
+   - rejects admin/super_admin commuter records
+   - rejects blocked/suspended commuter records
+
+6. AuthViewModel tracks:
+   - hasResolvedInitialAuthState
+   - isLoggedIn
+   - isGuest
+   - requiresEmailVerification
+   - requiresPasswordReset
+   - requiresPasswordChange
+
+7. DashboardScreen already waits for AuthViewModel.hasResolvedInitialAuthState
+   before deciding whether to redirect an unauthenticated user to Welcome.
+
+8. Logout is explicit:
+   AuthViewModel.logout()
+   -> AuthRepositoryImpl.logout()
+   -> AppSessionService.stopCommuterSession()
+   -> FirebaseAuth.signOut()
+
+   This matches the desired rule: explicit logout clears the saved login.
+
+9. AppSessionService is analytics/presence, not the login session.
+   It writes app_sessions documents and heartbeats, but Firebase Auth controls
+   whether the commuter remains signed in.
+
+Main assessment
+---------------
+The commuter app is already closer to the desired behavior than the old driver
+flow. It already has a splash/auth restore path and uses Firebase Auth local
+persistence.
+
+The main improvement should be reliability, not a big rewrite:
+- replace fixed 2.5-second splash timing with an auth gate that waits for the
+  auth repository/ViewModel to resolve the initial Firebase state
+- validate restored users before dashboard
+- route restored users to the correct gate: Dashboard, Email Verification,
+  Change Password, Welcome, or Login
+- do not sign out on temporary Firestore/network errors
+
+Main risks in current behavior
+------------------------------
+1. SplashScreen uses a fixed delay.
+
+   The 2.5-second delay may usually work, but it is not a strong guarantee.
+   On a slow device or poor startup condition, Firebase/AuthRepository might
+   still be resolving when SplashScreen decides where to go.
+
+2. AppRouter.redirect reads raw FirebaseAuth.currentUser.
+
+   This is fast, but it does not know everything AuthViewModel knows:
+   - hasResolvedInitialAuthState
+   - mustChangePassword
+   - pending email verification
+   - user profile validation result
+
+3. AuthRepositoryImpl can create a commuter document when _fetchUserFromFirestore
+   returns null.
+
+   That is useful for normal new users, but risky during transient Firestore
+   errors. A network/read failure could look like "missing profile" and cause
+   an unwanted profile creation path if not separated carefully.
+
+4. AuthRepositoryImpl signs out on role access errors, including
+   accountRoleCheckFailed.
+
+   accountRoleCheckFailed can be caused by FirebaseException during Firestore
+   checks. If it is truly a transient network/permission issue, automatic
+   signOut may make the commuter relogin problem worse.
+
+5. Guest mode behavior is intentionally different.
+
+   If the desired behavior includes "guest stays guest after accidental close,"
+   current SplashScreen conflicts with that because it signs out anonymous
+   users on every startup. If guest should remain temporary, current behavior
+   is acceptable.
+
+Recommended implementation plan
+-------------------------------
+1. Keep Firebase Auth as the session source.
+
+   Do not store raw passwords in SharedPreferences.
+   Do not build a custom password/session system.
+   Firebase Auth already persists signed-in email/password users locally on
+   Android/iOS unless signOut() is called or app data is cleared.
+
+2. Convert SplashScreen into a real session gate.
+
+   The splash/gate should wait for AuthViewModel.hasResolvedInitialAuthState
+   instead of relying only on a 2.5-second timer and raw currentUser.
+
+   Recommended flow:
+   - show splash animation/loading
+   - wait for AuthViewModel.hasResolvedInitialAuthState
+   - inspect AuthViewModel and FirebaseAuth current user
+   - route once the initial auth state is known
+
+3. Add/centralize saved-session validation.
+
+   Suggested place:
+   - AuthViewModel.validateSavedSession()
+   - or AuthRepositoryImpl.validateCurrentFirebaseUser()
+
+   It should check:
+   - FirebaseAuth.currentUser exists
+   - if anonymous guest, follow the guest product decision
+   - if email/password user, reload user
+   - if email not verified, route to Verify Email
+   - assert commuter account, not driver/admin
+   - check commuter status is not blocked/suspended
+   - load commuter profile
+   - inspect mustChangePassword
+
+4. Route restored users correctly.
+
+   Suggested decision table:
+   - no Firebase user -> Welcome
+   - anonymous guest, if guest should not persist -> sign out -> Welcome
+   - anonymous guest, if guest should persist -> Home
+   - real user but email not verified -> Verify Email
+   - real user with mustChangePassword -> Change Password
+   - valid active commuter -> Dashboard
+   - blocked/suspended/non-commuter -> sign out -> Login or Welcome with message
+   - network/server unavailable -> stay on retry screen, do not sign out
+
+5. Keep explicit Logout as the normal session-clearing action.
+
+   Do not call FirebaseAuth.signOut() for:
+   - app paused
+   - app inactive
+   - app detached
+   - accidental app close
+   - temporary network errors
+
+   Only call signOut() for:
+   - user taps Logout
+   - user chooses to leave a verification/password gate
+   - account is proven unauthorized, blocked, suspended, or wrong role
+
+6. Update GoRouter strategy.
+
+   Good options:
+   - keep initialLocation as splash and make SplashScreen handle all startup
+     session decisions
+   - or wire GoRouter redirect to an auth-state refresh notifier based on
+     AuthViewModel / AuthRepository stream
+
+   The simplest safer path is to keep SplashScreen and improve it into the
+   auth gate. That avoids a larger router refactor.
+
+7. Make network failures retryable.
+
+   On startup, if Firebase user exists but Firestore validation fails due to
+   network/unavailable/deadline timeout:
+   - keep the Firebase user signed in
+   - show "Try Again"
+   - keep GlobalConnectivityBanner visible
+   - avoid routing to Login or Welcome automatically
+
+8. Protect account-specific routes.
+
+   Guest should not access:
+   - Wallet
+   - Completed Trips
+   - Discount Application
+   - write actions requiring user identity
+
+   Current router already restricts many of these. Keep those restrictions when
+   improving session routing.
+
+9. Optional: remember last email only.
+
+   If desired, SharedPreferences can store only the last email to prefill Login
+   after real logout. This is not required for session persistence.
+
+10. Optional: web-specific persistence.
+
+   If commuter app runs as Flutter Web, confirm Firebase Auth web persistence.
+   If web does not persist after browser refresh, set web auth persistence to
+   local before login. Mobile does not need this custom setting.
+
+11. Optional: one-device-per-commuter.
+
+   Only add if the business rule is "one commuter account can be active on one
+   device at a time." This is different from "remember this device."
+
+   Possible design:
+   - generate stable deviceSessionId locally
+   - save activeDeviceSessionId on commuter document
+   - compare on startup
+   - force logout only when another device intentionally replaced the session
+
+   This should not be added unless explicitly required.
+
+Suggested future coding changes
+-------------------------------
+Smallest reliable implementation:
+1. Add a saved-session validation method to AuthViewModel/AuthRepositoryImpl.
+2. Update SplashScreen to wait for AuthViewModel.hasResolvedInitialAuthState.
+3. Replace the fixed currentUser-only routing decision with the decision table
+   above.
+4. Keep anonymous guest startup behavior as-is unless you decide guest sessions
+   should also persist.
+5. Add a retry state for startup network failures.
+
+Testing checklist for implementation
+------------------------------------
+Manual test cases:
+- Fresh install opens Welcome.
+- Login as valid commuter, close app, reopen: opens Dashboard without typing
+  password.
+- Press Home button, reopen: stays signed in.
+- Kill app from recent apps, reopen: stays signed in.
+- Tap Logout, reopen: opens Welcome/Login and does not auto-enter Dashboard.
+- Register but do not verify email, close/reopen: opens Verify Email.
+- Verified commuter with mustChangePassword, close/reopen: opens Change
+  Password.
+- Blocked/suspended commuter cannot enter Dashboard after reopen.
+- Driver account cannot enter commuter app after reopen.
+- Start as Guest, close/reopen: confirm chosen product behavior:
+  current behavior should return to Welcome.
+- Network unavailable during startup: app should not sign out automatically;
+  it should show retry or stay on splash/gate.
+
+Implementation risk notes
+-------------------------
+- Do not store commuter passwords locally.
+- Do not use app_sessions as the authentication source.
+- Do not sign out on temporary network errors.
+- Be careful with GoRouter redirects because they can run before Provider
+  auth state is fully resolved.
+- Keep guest mode separate from real commuter login.
+- Ignore commuter/lib/core/router/app_router.dart.tmp unless intentionally
+  recovering old router work; it appears to be a temporary/reference file, not
+  the active router.

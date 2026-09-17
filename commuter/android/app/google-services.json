@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "1010466683287",
+    "firebase_url": "https://byaheroxperience-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "byaheroxperience",
+    "storage_bucket": "byaheroxperience.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1010466683287:android:2f6c9f359c9d11daee2cd2",
+        "android_client_info": {
+          "package_name": "com.byaherox.commuter"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCxgDXw-CGTYJZESsog1sQ-VjpLGM1nNT8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

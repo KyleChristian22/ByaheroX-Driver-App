@@ -1,0 +1,32 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isDiscountReviewer() {
+      return isSignedIn() && (
+        firestore.exists(/databases/(default)/documents/admin/$(request.auth.uid)) ||
+        firestore.exists(/databases/(default)/documents/treasurer/$(request.auth.uid)) ||
+        firestore.exists(/databases/(default)/documents/staff/$(request.auth.uid))
+      );
+    }
+
+    match /gcash_receipts/{commuterId}/{receiptFile} {
+      allow read: if isSignedIn() && request.auth.uid == commuterId;
+      allow write: if false;
+    }
+
+    match /discount_applications/{commuterId}/{documentFile} {
+      allow read: if (isSignedIn() && request.auth.uid == commuterId) ||
+        isDiscountReviewer();
+      allow write: if isSignedIn() && request.auth.uid == commuterId;
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

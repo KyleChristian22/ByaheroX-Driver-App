@@ -1,0 +1,316 @@
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../constants/app_colors.dart';
+import '../constants/app_dimensions.dart';
+import '../../presentation/screens/splash/splash_screen.dart';
+import '../../presentation/screens/welcome/welcome_screen.dart';
+import '../../presentation/screens/login/login_screen.dart';
+import '../../presentation/screens/login/forgot_password_screen.dart';
+import '../../presentation/screens/login/change_password_screen.dart';
+import '../../presentation/screens/register/email_verification_screen.dart';
+import '../../presentation/screens/register/register_screen.dart';
+import '../../presentation/screens/dashboard/dashboard_screen.dart';
+import '../../presentation/screens/fares/fares_screen.dart';
+import '../../presentation/screens/home/home_screen.dart';
+import '../../presentation/screens/history/completed_trips_screen.dart';
+import '../../presentation/screens/discount/discount_application_screen.dart';
+import '../../presentation/screens/profile/profile_screen.dart';
+import '../../presentation/screens/wallet/wallet_screen.dart';
+import '../../presentation/screens/main_shell.dart';
+import '../../presentation/widgets/common/app_background.dart';
+
+/// App router configuration using GoRouter
+class AppRouter {
+  AppRouter._();
+
+  /// Route names
+  static const String splash = '/';
+  static const String welcome = '/welcome';
+  static const String login = '/login';
+  static const String forgotPassword = '/forgot-password';
+  static const String changePassword = '/change-password';
+  static const String register = '/register';
+  static const String verifyEmail = '/verify-email';
+  static const String dashboard = '/dashboard';
+  static const String home = '/home';
+  static const String profile = '/profile';
+  static const String wallet = '/wallet';
+  static const String completedTrips = '/completed-trips';
+  static const String discountApplication = '/discount-application';
+  static const String fares = '/fares';
+
+  /// Global navigator key
+  static final GlobalKey<NavigatorState> _rootNavigatorKey =
+      GlobalKey<NavigatorState>(debugLabel: 'root');
+  static final GlobalKey<NavigatorState> _shellNavigatorKey =
+      GlobalKey<NavigatorState>(debugLabel: 'shell');
+
+  /// Router configuration
+  static final GoRouter router = GoRouter(
+    navigatorKey: _rootNavigatorKey,
+    initialLocation: splash,
+    debugLogDiagnostics: true,
+    routes: [
+      // Splash Screen
+      GoRoute(
+        path: splash,
+        name: 'splash',
+        builder: (context, state) => const SplashScreen(),
+      ),
+
+      // Welcome Screen
+      GoRoute(
+        path: welcome,
+        name: 'welcome',
+        builder: (context, state) => const WelcomeScreen(),
+      ),
+
+      // Login Screen
+      GoRoute(
+        path: login,
+        name: 'login',
+        builder: (context, state) => const LoginScreen(),
+      ),
+
+      // Forgot Password Screen
+      GoRoute(
+        path: forgotPassword,
+        name: 'forgotPassword',
+        builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+
+      GoRoute(
+        path: changePassword,
+        name: 'changePassword',
+        builder: (context, state) => const ChangePasswordScreen(),
+      ),
+
+      // Register Screen
+      GoRoute(
+        path: register,
+        name: 'register',
+        builder: (context, state) => const RegisterScreen(),
+      ),
+
+      // Email Verification Screen
+      GoRoute(
+        path: verifyEmail,
+        name: 'verifyEmail',
+        builder: (context, state) => const EmailVerificationScreen(),
+      ),
+
+      // Main Shell (with bottom navigation)
+      ShellRoute(
+        navigatorKey: _shellNavigatorKey,
+        builder: (context, state, child) => MainShell(child: child),
+        routes: [
+          // Dashboard (Landing page after login)
+          GoRoute(
+            path: dashboard,
+            name: 'dashboard',
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: DashboardScreen()),
+          ),
+
+          // Home/Map Screen
+          GoRoute(
+            path: home,
+            name: 'home',
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: HomeScreen()),
+          ),
+
+          // Profile Screen
+          GoRoute(
+            path: profile,
+            name: 'profile',
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: ProfileScreen()),
+          ),
+        ],
+      ),
+
+      // Wallet Screen (outside shell, full screen)
+      GoRoute(
+        path: wallet,
+        name: 'wallet',
+        builder: (context, state) => const WalletScreen(),
+      ),
+
+      GoRoute(
+        path: completedTrips,
+        name: 'completedTrips',
+        builder: (context, state) => const CompletedTripsScreen(),
+      ),
+
+      GoRoute(
+        path: discountApplication,
+        name: 'discountApplication',
+        builder: (context, state) => const DiscountApplicationScreen(),
+      ),
+
+      GoRoute(
+        path: fares,
+        name: 'fares',
+        builder: (context, state) => const FaresScreen(),
+      ),
+    ],
+
+    // Error handling
+    errorBuilder: (context, state) => Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: Padding(
+              padding: AppDimensions.paddingLg,
+              child: GlassSurface(
+                padding: AppDimensions.paddingXl,
+                child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Semantics(
+                        label: 'Route error',
+                        child: Container(
+                          width: 72,
+                          height: 72,
+                          decoration: BoxDecoration(
+                            color: AppColors.accentRedSurface,
+                            borderRadius: AppDimensions.borderRadiusLg,
+                          ),
+                          child: const Icon(
+                            Icons.route_outlined,
+                            size: 40,
+                            color: AppColors.accentRed,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: AppDimensions.lg),
+                      Text(
+                        'Page not found',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
+                      const SizedBox(height: AppDimensions.sm),
+                      Text(
+                        state.uri.toString(),
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                      ),
+                      const SizedBox(height: AppDimensions.xl),
+                      ElevatedButton.icon(
+                        onPressed: () => context.go(home),
+                        icon: const Icon(Icons.home_outlined),
+                        label: const Text('Return Home'),
+                      ),
+                    ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+
+    redirect: (context, state) {
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      final isAuthenticated = firebaseUser != null && !firebaseUser.isAnonymous;
+      final isGuest = firebaseUser != null && firebaseUser.isAnonymous;
+      final location = state.uri.toString();
+
+      if (isAuthenticated) {
+        if (location == AppRouter.welcome || location == AppRouter.login) {
+          return AppRouter.dashboard;
+        }
+        return null;
+      }
+
+      if (isGuest) {
+        if (location == AppRouter.welcome || location == AppRouter.login) {
+          return AppRouter.home;
+        }
+        return null;
+      }
+
+      const protectedRoutes = <String>{
+        AppRouter.dashboard,
+        AppRouter.home,
+        AppRouter.profile,
+        AppRouter.wallet,
+        AppRouter.completedTrips,
+        AppRouter.discountApplication,
+        AppRouter.fares,
+      };
+
+      if (protectedRoutes.contains(location)) {
+        return AppRouter.welcome;
+      }
+
+      return null;
+    },
+  );
+
+  /// Navigate to dashboard
+  static void goToDashboard(BuildContext context) {
+    context.go(dashboard);
+  }
+
+  /// Navigate to home
+  static void goToHome(BuildContext context) {
+    context.go(home);
+  }
+
+  /// Navigate to login
+  static void goToLogin(BuildContext context) {
+    context.go(login);
+  }
+
+  /// Navigate to forgot password
+  static void goToForgotPassword(BuildContext context) {
+    context.go(forgotPassword);
+  }
+
+  static void goToChangePassword(BuildContext context) {
+    context.go(changePassword);
+  }
+
+  /// Navigate to register
+  static void goToRegister(BuildContext context) {
+    context.go(register);
+  }
+
+  /// Navigate to email verification
+  static void goToVerifyEmail(BuildContext context) {
+    context.go(verifyEmail);
+  }
+
+  /// Navigate to wallet
+  static void goToWallet(BuildContext context) {
+    context.go(wallet);
+  }
+
+  static void goToCompletedTrips(BuildContext context) {
+    context.go(completedTrips);
+  }
+
+  static void goToDiscountApplication(BuildContext context) {
+    context.go(discountApplication);
+  }
+
+  static void goToFares(BuildContext context) {
+    context.push(fares);
+  }
+
+  /// Navigate to splash
+  static void goToSplash(BuildContext context) {
+    context.go(splash);
+  }
+
+  /// Navigate to welcome
+  static void goToWelcome(BuildContext context) {
+    context.go(welcome);
+  }
+}
