@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Modify this file to customize your launch splash screen -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Transparent background - no white border -->
+    <item android:drawable="@android:color/transparent" />
+
+    <!-- Driver Icon as centered splash image -->
+    <item>
+        <bitmap
+            android:gravity="center"
+            android:src="@mipmap/driver_icon" />
+    </item>
+</layer-list>

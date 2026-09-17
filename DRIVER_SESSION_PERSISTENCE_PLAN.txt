@@ -1,0 +1,229 @@
+Driver App Session Persistence Plan
+===================================
+
+What the request means
+----------------------
+The driver should not need to type email and password again every time the app
+is accidentally closed, killed, backgrounded, or reopened on the same device.
+
+Expected behavior:
+- First install / first use: show Login.
+- Successful driver login: remember the Firebase Auth session on that device.
+- App closed accidentally: reopen directly into the correct driver area after
+  validating the remembered account.
+- App backgrounded / resumed: keep the account signed in.
+- Explicit Logout button: clear the Firebase Auth session and return to Login.
+- Admin disables/removes driver account: remembered session must not continue
+  into the app.
+- Temporary-password driver: resume to Change Password until password setup is
+  complete.
+- Unverified email driver: resume to Email Verification until verified.
+
+Current code findings
+---------------------
+Important files inspected:
+- driver/lib/main.dart
+- driver/lib/core/router/app_router.dart
+- driver/lib/presentation/viewmodels/auth_viewmodel.dart
+- driver/lib/presentation/screens/auth/login_screen.dart
+- driver/lib/presentation/screens/auth/email_verification_screen.dart
+- driver/lib/presentation/screens/auth/change_password_screen.dart
+- driver/lib/presentation/screens/profile/profile_screen.dart
+- driver/lib/services/firestore_service.dart
+- driver/lib/services/analytics_tracking_service.dart
+- driver/pubspec.yaml
+
+Observed behavior source:
+1. main.dart always starts the app with:
+   initialRoute: AppRouter.login
+
+   This means the UI always opens the login screen, even if
+   FirebaseAuth.instance.currentUser is already restored by Firebase.
+
+2. AuthViewModel already listens to Firebase Auth:
+   _auth.authStateChanges().listen(...)
+
+   It updates _currentUser, but it does not automatically route an already
+   signed-in user away from Login during app startup.
+
+3. Firebase Auth is already used:
+   firebase_auth: ^5.2.0
+
+   On Android/iOS, Firebase Auth normally persists the signed-in user locally
+   unless signOut() is called, the user is disabled, credentials become invalid,
+   or app data is cleared.
+
+4. Logout is explicit and correct in principle:
+   Profile screen -> authViewModel.logout()
+   AuthViewModel.logout() -> AnalyticsTrackingService.stopDriverSession()
+                         -> _auth.signOut()
+
+   This matches the desired rule: only explicit logout should require login
+   again.
+
+5. app_sessions in AnalyticsTrackingService is not the login session.
+   It tracks active/inactive app usage in Firestore, but it does not control
+   whether the driver remains authenticated on the device.
+
+Main problem
+------------
+The app likely already has Firebase's local auth persistence available, but the
+startup route ignores it by forcing /login. The solution should be an auth gate
+or splash route that waits for Firebase Auth to restore the saved user, then
+validates that driver before deciding where to go.
+
+Recommended implementation plan
+-------------------------------
+1. Add a startup/auth gate screen or widget.
+
+   Suggested name:
+   - StartupAuthGate
+   - SessionGateScreen
+   - AuthGateScreen
+
+   It should be the initial screen instead of Login.
+
+2. Change startup route behavior.
+
+   In main.dart, replace:
+   initialRoute: AppRouter.login
+
+   With either:
+   - initialRoute: AppRouter.authGate
+
+   Or replace the whole root body with a widget that listens to auth state.
+
+3. Add a new route in AppRouter.
+
+   Suggested route:
+   static const String authGate = '/';
+
+   Route should build StartupAuthGate.
+
+4. In StartupAuthGate, wait for Firebase restoration.
+
+   The gate should check:
+   - FirebaseAuth.instance.authStateChanges()
+   - or FirebaseAuth.instance.currentUser after Firebase.initializeApp()
+
+   While checking, show a simple loading screen with app background, not Login.
+
+5. If no Firebase user exists, route to Login.
+
+   This covers:
+   - first use
+   - after explicit logout
+   - after app data clear
+   - expired/invalid auth state
+
+6. If a Firebase user exists, reload and validate the account.
+
+   Validation should reuse existing logic/patterns from AuthViewModel and
+   FirestoreService:
+   - user.reload()
+   - currentUser still exists
+   - emailVerified is true, otherwise go to Email Verification
+   - FirestoreService.getCurrentDriverProfileResult()
+   - role == 'driver'
+   - isActive == true
+   - mustSetPassword decides Change Password vs Main
+
+7. Initialize post-login app data before Main.
+
+   Before routing to Main, do what LoginScreen does after manual login:
+   - context.read<JeepneyViewModel>().initializeAfterLogin()
+   - if hasAssignedJeepney, set TripViewModel current jeepney ID
+   - start/resume analytics session is already handled by main.dart auth listener
+
+8. Keep explicit Logout as the only normal session-clearing action.
+
+   Do not call FirebaseAuth.signOut() on:
+   - app paused
+   - app detached
+   - accidental close
+   - route failures
+   - ordinary network errors
+
+   Only call signOut() when:
+   - driver taps Logout
+   - account is proven invalid/unauthorized
+   - driver profile missing or inactive, if product decision requires forced
+     logout for those states
+
+9. Avoid storing raw password locally.
+
+   Do not save email/password in SharedPreferences.
+   Firebase Auth should handle the secure session token.
+
+10. Optional: remember last email only for convenience.
+
+   If desired, save only the email address in SharedPreferences to prefill the
+   Login form after a real logout. This is convenience only and not required
+   for session persistence.
+
+11. Optional: web-specific persistence.
+
+   If the driver app is used as Flutter Web, confirm whether Firebase Auth web
+   persistence is behaving as intended. If not, set web persistence to local
+   before login. This is platform-specific and should be guarded so mobile does
+   not depend on it.
+
+12. Optional: one-device-per-driver enforcement.
+
+   Only add this if the business rule is "a driver account can be active on
+   one device at a time." That is different from "remember this device."
+
+   Possible design:
+   - Generate a stable deviceSessionId on first login and store it locally.
+   - Save it to the driver's Firestore document as activeDeviceSessionId.
+   - On app startup, compare local deviceSessionId with Firestore.
+   - If another device replaced it, force logout and show a clear message.
+
+   This needs careful product approval because it can kick out drivers who
+   change phones or reinstall the app.
+
+Suggested flow
+--------------
+App launch:
+1. Firebase.initializeApp()
+2. Open AuthGate
+3. AuthGate waits for FirebaseAuth current user
+4. No user -> Login
+5. User exists -> reload user
+6. Not verified -> Email Verification
+7. Fetch driver profile
+8. Invalid role / inactive / missing -> sign out and Login with message
+9. mustSetPassword -> Change Password
+10. valid active driver -> initialize jeepney/trip state -> Main
+
+Testing checklist for implementation
+------------------------------------
+Manual test cases:
+- Fresh install opens Login.
+- Login as valid active driver, close app, reopen: opens Main without typing
+  password.
+- Press phone Home button, reopen: stays signed in.
+- Kill app from recent apps, reopen: stays signed in.
+- Tap Logout, reopen app: opens Login.
+- Login with unverified email, close/reopen: opens Email Verification.
+- Login with mustSetPassword, close/reopen: opens Change Password.
+- Admin disables driver while app is closed, reopen: does not enter Main.
+- Network unavailable during startup: do not sign out automatically; show a
+  retry/offline-friendly state if possible.
+
+Implementation risk notes
+-------------------------
+- Do not route directly to Main just because Firebase currentUser exists.
+  The app must still validate role, active status, email verification, and
+  password setup.
+- Be careful with async navigation from initState; use mounted checks.
+- Avoid duplicate initialization of JeepneyViewModel.
+- Avoid calling signOut() for temporary network/server errors, because that
+  would recreate the same hassle.
+- Keep AnalyticsTrackingService app_sessions separate from authentication.
+
+Recommended first coding change later
+-------------------------------------
+Create StartupAuthGate and make it the initial route. That is the smallest
+clean change that fixes accidental-close relogin while preserving explicit
+logout behavior.

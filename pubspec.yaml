@@ -1,0 +1,104 @@
+name: driver_app
+description: "ByaheroX - Crowd-Level–Based Real-Time Jeepney Tracking System"
+publish_to: 'none'
+
+version: 4.4.4+9
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # iOS style icons
+  cupertino_icons: ^1.0.8
+
+  # -----------------------------
+  # Firebase (Backend)
+  # -----------------------------
+  firebase_core: ^3.4.0
+  firebase_auth: ^5.2.0
+  cloud_firestore: ^5.4.0
+  firebase_messaging: ^15.0.3
+
+  # -----------------------------
+  # State Management
+  # -----------------------------
+  provider: ^6.1.2
+
+  # -----------------------------
+  # Location (Driver GPS)
+  # -----------------------------
+  geolocator: ^13.0.1
+  app_settings: ^5.1.1
+
+  # Connectivity
+  # -------- ----
+  connectivity_plus: ^7.1.1
+
+  # -----------------------------
+  # OpenStreetMap (OSM) Map
+  # -----------------------------
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+
+  # -----------------------------
+  # HTTP (Geoapify API calls later)
+  # -----------------------------
+  http: ^1.2.2
+
+  # -----------------------------
+  # File System
+  # -----------------------------
+  path_provider: ^2.1.4
+
+  # -----------------------------
+  # Notifications
+  # -----------------------------
+  flutter_local_notifications: ^17.2.2
+  audioplayers: ^6.1.0
+
+  # -----------------------------
+  # Localization
+  # ---------------------------
+  flutter_localizations:
+    sdk: flutter
+
+  # -----------------------------
+  # Utilities (Optional but helpful)
+  # -----------------------------
+  intl: ^0.20.2
+  uuid: ^4.5.1
+  shared_preferences: ^2.3.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  # Recommended lints
+  flutter_lints: ^5.0.0
+
+  # Optional: Generate app launcher icons easily
+  # Run: flutter pub run flutter_launcher_icons:main
+  flutter_launcher_icons: ^0.13.1
+
+flutter:
+  uses-material-design: true
+  generate: true
+
+  # Assets folder for images
+  assets:
+    - assets/images/
+    - assets/audio/Para ulet.m4a
+
+# Optional: App launcher icon config (only works if you add an icon file)
+# 1) Put your icon here: assets/icons/app_icon.png
+# 2) Uncomment below and run:
+#    flutter pub run flutter_launcher_icons:main
+#
+# flutter_launcher_icons:
+#   android: true
+#   ios: true
+#   image_path: "assets/icons/app_icon.png"
+#   min_sdk_android: 21

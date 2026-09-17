@@ -1,0 +1,96 @@
+{
+  "@@locale": "en",
+  "appName": "ByaheroX Driver",
+  "@appName": {
+    "description": "The app name"
+  },
+  "driverLogin": "Driver Login",
+  "@driverLogin": {
+    "description": "Login screen subtitle"
+  },
+  "email": "Email",
+  "@email": {
+    "description": "Email field label"
+  },
+  "enterYourEmail": "Enter your email",
+  "@enterYourEmail": {
+    "description": "Email field hint"
+  },
+  "emailIsRequired": "Email is required",
+  "@emailIsRequired": {
+    "description": "Email validation error"
+  },
+  "enterValidEmail": "Please enter a valid email address",
+  "@enterValidEmail": {
+    "description": "Email format validation error"
+  },
+  "password": "Password",
+  "@password": {
+    "description": "Password field label"
+  },
+  "enterYourPassword": "Enter your password",
+  "@enterYourPassword": {
+    "description": "Password field hint"
+  },
+  "passwordIsRequired": "Password is required",
+  "@passwordIsRequired": {
+    "description": "Password validation error"
+  },
+  "passwordMinLength": "Password must be at least 6 characters",
+  "@passwordMinLength": {
+    "description": "Password length validation error"
+  },
+  "login": "Login",
+  "@login": {
+    "description": "Login button text"
+  },
+  "forgotPassword": "Forgot Password?",
+  "@forgotPassword": {
+    "description": "Forgot password link"
+  },
+  "resetPassword": "Reset Password",
+  "@resetPassword": {
+    "description": "Reset password dialog title"
+  },
+  "resetPasswordDescription": "Enter your email address and we will send you a link to reset your password.",
+  "@resetPasswordDescription": {
+    "description": "Reset password dialog description"
+  },
+  "cancel": "Cancel",
+  "@cancel": {
+    "description": "Cancel button"
+  },
+  "sendResetLink": "Send Reset Link",
+  "@sendResetLink": {
+    "description": "Send reset link button"
+  },
+  "passwordResetSent": "Password reset link sent! Check your email.",
+  "@passwordResetSent": {
+    "description": "Password reset success message"
+  },
+  "failedToSendReset": "Failed to send reset email",
+  "@failedToSendReset": {
+    "description": "Password reset error message"
+  },
+  "tryAgainIn": "Try again in {seconds}",
+  "@tryAgainIn": {
+    "description": "Lockout timer message",
+    "placeholders": {
+      "seconds": {
+        "type": "String"
+      }
+    }
+  },
+  "switchLanguage": "Switch Language",
+  "@switchLanguage": {
+    "description": "Language switcher tooltip"
+  },
+  "english": "English",
+  "@english": {
+    "description": "English language option"
+  },
+  "tagalog": "Tagalog",
+  "@tagalog": {
+    "description": "Tagalog language option"
+  }
+}
