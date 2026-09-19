@@ -56,7 +56,6 @@ app.*.map.json
 
 # iOS related
 /ios/Pods/
-/ios/Runner.xcworkspace/
 /ios/.symlinks/
 *.mode1v3
 *.mode2v3
