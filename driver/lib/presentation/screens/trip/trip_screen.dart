@@ -3316,42 +3316,6 @@ class _TripScreenState extends State<TripScreen> with TickerProviderStateMixin {
     );
   }
 
-  void _showLowAccuracySnackbar(double accuracy) {
-    final languageViewModel = context.read<LanguageViewModel>();
-    final isTagalog = languageViewModel.isTagalog;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          isTagalog
-              ? 'Lokasyon hindi gaanong tumpak (±${accuracy.toStringAsFixed(0)}m). Nasa loob ng gusali?'
-              : 'Location not very accurate (±${accuracy.toStringAsFixed(0)}m). Indoors?',
-          style: const TextStyle(fontSize: 14),
-        ),
-        backgroundColor: Colors.orange.shade700,
-        duration: const Duration(seconds: 4),
-      ),
-    );
-  }
-
-  void _showHighAccuracySnackbar(double accuracy) {
-    final languageViewModel = context.read<LanguageViewModel>();
-    final isTagalog = languageViewModel.isTagalog;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          isTagalog
-              ? 'Lokasyon ay tumpak (±${accuracy.toStringAsFixed(0)}m)'
-              : 'Location accurate (±${accuracy.toStringAsFixed(0)}m)',
-          style: const TextStyle(fontSize: 14),
-        ),
-        backgroundColor: Colors.green.shade700,
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-
   Future<bool> _checkLocationPermission({
     bool requestIfDenied = true,
   }) async {
